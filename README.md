@@ -106,4 +106,4 @@ python src/visualize_preds.py     # 4-panel stage figures -> graphs/pred_sample_
   dark blue=cytoplasm, light blue=nucleus), not grayscale thresholding.
 - The image crop and its ground-truth mask always share one bounding box
   (`dataset.py::load_pair`), used identically at train and inference time.
-# An-Improved-Boykov-s-Graph-Cut-Based-Segmentation-Technique
+- The pipeline was first sanity-checked on a single sample, confirming the full model → graph cut → CRF flow runs end to end and produces a plausible nucleus mask.

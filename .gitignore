@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Dataset (user pastes this in locally, not committed)
+Data/*/*
+!Data/*/.gitkeep
+
+# Trained weights / large checkpoints (keep the folder, not the binaries)
+checkpoints/*.pt
+!checkpoints/.gitkeep
+
+# Generated figures and metrics (regenerate by re-running the pipeline)
+graphs/*.png
+!graphs/.gitkeep
+outputs/*.png
+outputs/*.csv
+outputs/*.json
+!outputs/.gitkeep
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/

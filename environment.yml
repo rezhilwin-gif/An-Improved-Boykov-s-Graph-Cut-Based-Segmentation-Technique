@@ -1,0 +1,18 @@
+name: ibgc-crf-spsst
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - opencv
+  - matplotlib
+  - pytorch
+  - torchvision
+  - scikit-learn
+  - scikit-image>=0.19
+  - pip:
+      - PyMaxflow
+      - git+https://github.com/lucasb-eyer/pydensecrf.git

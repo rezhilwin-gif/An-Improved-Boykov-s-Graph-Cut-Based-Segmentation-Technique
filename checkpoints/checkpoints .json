@@ -1,0 +1,126 @@
+{
+  "source_notebook": "IBGC_CRF_SPSST_final_kaggle (patched).ipynb",
+  "generated_by": "src/train.py + src/tune_hyperparams.py write the *_config.json files at this path when actually run; this file is a static snapshot of the notebook's own settings/metadata for reference and version control.",
+
+  "reproducibility": {
+    "seed": 42,
+    "device_policy": "cuda if torch.cuda.is_available() else cpu"
+  },
+
+  "dataset": {
+    "name": "Herlev Pap Smear (2005)",
+    "expected_classes": [
+      "normal_superficiel",
+      "normal_intermediate",
+      "normal_columnar",
+      "light_dysplastic",
+      "moderate_dysplastic",
+      "severe_dysplastic",
+      "carcinoma_in_situ"
+    ],
+    "ground_truth_encoding": {
+      "reference": "martin2003.pdf",
+      "colors_bgr": {
+        "background": [0, 0, 255],
+        "cytoplasm": [128, 0, 0],
+        "nucleus": [255, 0, 0]
+      },
+      "parsing_method": "nearest-color classification (np.argmin over per-pixel distance to the 3 reference BGR triplets), not grayscale thresholding"
+    },
+    "raw_mask_pairing_rule": "mask files ending in '-d.bmp'/'-d.BMP' are paired with a raw image named '<base>.BMP' or '<base>_2.BMP'",
+    "train_val_split": {
+      "test_size": 0.15,
+      "stratify_by": "class_name",
+      "random_state": 42
+    }
+  },
+
+  "preprocessing": {
+    "bias_correction": {
+      "method": "homomorphic-style log high-pass filter on the grayscale V channel",
+      "gaussian_blur_sigma": 25
+    },
+    "crop": {
+      "method": "Otsu threshold + largest external contour bounding box",
+      "padding_px": 10,
+      "note": "ONE bbox is computed from the (bias-corrected) image and applied to BOTH the image and its ground-truth mask (see load_pair), so train and inference preprocessing match exactly"
+    },
+    "model_input_size": 224,
+    "normalization": {
+      "mean": [0.485, 0.456, 0.406],
+      "std": [0.229, 0.224, 0.225]
+    }
+  },
+
+  "model": {
+    "architecture": "VGG16_FCN8",
+    "backbone": "torchvision vgg16 (ImageNet pretrained, VGG16_Weights.DEFAULT)",
+    "output_channels": 1,
+    "output_note": "single-channel logit; sigmoid gives foreground/nucleus probability directly (original notebook had a dead unused second channel, removed)",
+    "skip_connections": ["pool3 (256ch)", "pool4 (512ch)", "pool5 (512ch)"],
+    "upsampling": "ConvTranspose2d stages: 2x from pool5, 2x from pool4 fusion, final 8x to input resolution"
+  },
+
+  "training": {
+    "loss": "BCEWithLogitsLoss + soft Dice loss (summed)",
+    "optimizer": "Adam",
+    "batch_size": 8,
+    "lr_candidates": [5e-05],
+    "epoch_candidates": [80],
+    "lr_candidates_full_grid_todo": [1e-04, 5e-05],
+    "epoch_candidates_full_grid_todo": [40, 50, 60],
+    "note": "grids reduced from the paper-order full sweep so a first pass finishes in one session; widen back once a clean run completes",
+    "checkpoint_policy": "state_dict cloned to CPU before storing; model/optimizer deleted + torch.cuda.empty_cache() + gc.collect() between configs to avoid GPU memory buildup across sequential runs",
+    "selection_metric": "best validation Dice score",
+    "dice_threshold": 0.5
+  },
+
+  "postprocessing_pipeline": {
+    "stages": ["SLIC superpixel probability smoothing", "Boykov graph cut", "DenseCRF boundary refinement"],
+    "superpixels": {
+      "method": "skimage.segmentation.slic",
+      "n_segments_candidates": [200],
+      "n_segments_full_grid_todo": [200, 250, 300],
+      "compactness": 10
+    },
+    "graph_cut": {
+      "library": "PyMaxflow",
+      "lambda_k_grid": [40.0, 50.0, 60.0],
+      "sigma_grid": [20.0, 25.0, 30.0],
+      "known_fix": "get_grid_segments() returns True for the SINK side of the min-cut, which corresponds to BACKGROUND given how t-edge costs are assigned here; labels are inverted (1=foreground/nucleus, 0=background) before use downstream"
+    },
+    "crf": {
+      "library": "pydensecrf.densecrf.DenseCRF2D",
+      "iterations_candidates": [10],
+      "iterations_full_grid_todo": [5, 10, 15],
+      "pairwise_gaussian": {"sxy": 3, "compat": 3},
+      "pairwise_bilateral": {"sxy": 20, "srgb": 13, "compat": 10}
+    },
+    "hyperparameter_search": {
+      "validation_subset_n": 30,
+      "selection_metric": "mean accuracy across the subset"
+    },
+    "sanity_check": "warn if predicted foreground fraction > 0.6 of image area (nucleus is normally a minority region) -- catches label-inversion-style bugs"
+  },
+
+  "metrics_reported": ["accuracy", "precision", "recall", "specificity"],
+
+  "environment_requirements": {
+    "hard_dependencies": ["PyMaxflow", "scikit-image>=0.19", "pydensecrf (git+https://github.com/lucasb-eyer/pydensecrf.git)"],
+    "policy": "these import at the top with hard failures, not silent try/except->None fallbacks, so a broken install stops the run instead of silently downgrading graph cut / CRF to a stub"
+  },
+
+  "patch_notes_applied": [
+    "defined previously-missing bias_correct() and crop_to_cell()",
+    "reordered pipeline-function definitions before the hyperparameter sweep that calls them",
+    "replaced grayscale/127-threshold ground truth with nearest-color 3-class parsing",
+    "image crop and ground-truth mask now share one bounding box (load_pair)",
+    "training and inference now use the identical preprocessing function",
+    "removed unused second output channel from the model",
+    "checkpoints moved to CPU + explicit GPU cleanup between sequential training runs",
+    "reduced default hyperparameter grids to fit one session; documented full grids to restore",
+    "per-config checkpoints saved immediately so a sweep crash doesn't lose completed runs",
+    "PyMaxflow / pydensecrf / scikit-image made hard imports instead of silent fallbacks",
+    "fixed Boykov graph-cut foreground/background label inversion"
+  ]
+}

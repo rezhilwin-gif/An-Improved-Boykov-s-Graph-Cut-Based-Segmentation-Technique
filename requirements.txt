@@ -1,0 +1,9 @@
+numpy
+opencv-python
+matplotlib
+torch
+torchvision
+scikit-learn
+scikit-image>=0.19
+PyMaxflow
+git+https://github.com/lucasb-eyer/pydensecrf.git
